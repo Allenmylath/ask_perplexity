@@ -48,10 +48,10 @@ async def handle_perplexity(function_name, tool_call_id, args, llm, context, res
     await result_callback([{"role": "assistant", "content": response}])
 
 async def main():
-    port = int(os.getenv("PORT", 5000))
+    port = int(os.getenv("PORT"))
     transport = WebsocketServerTransport(
         params=WebsocketServerParams(
-            host="0.0.0.0",  # Changed from empty string
+            host="",  # Changed from empty string
             port=port,
             audio_out_enabled=True,
             add_wav_header=True,
