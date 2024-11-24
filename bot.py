@@ -59,7 +59,6 @@ async def main():
             vad_analyzer=SileroVADAnalyzer(),
             vad_audio_passthrough=True,
             audio_in_filter=NoisereduceFilter(),
-            max_clients=1
         )
     )
 
