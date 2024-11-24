@@ -51,7 +51,7 @@ async def main():
     port = int(os.getenv("PORT", 5000))
     transport = WebsocketServerTransport(
         params=WebsocketServerParams(
-            host="",
+            host="0.0.0.0",  # Changed from empty string
             port=port,
             audio_out_enabled=True,
             add_wav_header=True,
@@ -59,6 +59,7 @@ async def main():
             vad_analyzer=SileroVADAnalyzer(),
             vad_audio_passthrough=True,
             audio_in_filter=NoisereduceFilter(),
+            max_clients=1
         )
     )
 
@@ -69,15 +70,17 @@ async def main():
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
-        voice_id="829ccd10-f8b3-43cd-b8a0-4aeaa81f3b30",  # British Lady
+        voice_id="829ccd10-f8b3-43cd-b8a0-4aeaa81f3b30",
     )
 
-    messages = []
+    # Initialize context with messages
+    messages = [
+        {
+            "role": "system",
+            "content": "You are a helpful voice assistant. When a user asks a question, use the ask_perplexity function to get the answer."
+        }
+    ]
     context = OpenAILLMContext(messages=messages)
-    context.add_message({
-        "role": "system",
-        "content": "You are a helpful voice assistant. When a user asks a question, use the ask_perplexity function to get the answer."
-    })
     context.set_tools([
         {
             "type": "function",
@@ -104,23 +107,27 @@ async def main():
     fl = FrameLogger("LLM Output")
 
     pipeline = Pipeline([
-        transport.input(),  # WebSocket input
-        stt,  # Speech-To-Text
-        context_aggregator.user(),  # User responses
-        llm,  # LLM
-        fl,  # Frame logger
-        tts,  # Text-To-Speech
-        transport.output(),  # WebSocket output
-        context_aggregator.assistant(),  # Assistant responses
+        transport.input(),
+        stt,
+        context_aggregator.user(),
+        llm,
+        fl,
+        tts,
+        transport.output(),
+        context_aggregator.assistant(),
     ])
 
     task = PipelineTask(pipeline, PipelineParams(allow_interruptions=False))
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
+        logger.info("New client connected")
         context.messages.clear()
+        context.add_message({
+            "role": "system",
+            "content": "You are a helpful voice assistant. When a user asks a question, use the ask_perplexity function to get the answer."
+        })
         context_aggregator = llm.create_context_aggregator(context)
-        print("New client connected")
         await task.queue_frames([OpenAILLMContextFrame(context)])
 
     @transport.event_handler("on_client_disconnected")
