@@ -29,7 +29,7 @@ def ask_perplexity(question: str) -> str:
     headers = {
         "accept": "application/json",
         "content-type": "application/json",
-        "Authorization": "Bearer your_api_key_here"
+        "Authorization": f"Bearer {os.getenv('PERPLEXITY_API_KEY')}"
     }
     
     data = {
@@ -42,7 +42,7 @@ def ask_perplexity(question: str) -> str:
     
     response = requests.post(url, headers=headers, json=data)
     return response.json()["choices"][0]["message"]["content"]
-
+    
 async def handle_perplexity(function_name, tool_call_id, args, llm, context, result_callback):
     response = ask_perplexity(args["question"])
     await result_callback([{"role": "assistant", "content": response}])
