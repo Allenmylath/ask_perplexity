@@ -22,13 +22,19 @@ from noisereduce_filter import NoisereduceFilter
 
 load_dotenv(override=True)
 
-# Configure logging with proper timestamp formatting
 logger.remove()
 logger.add(
     sys.stderr,
     format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level} | {message}",
     level="DEBUG"
 )
+
+# Define system message as a constant
+SYSTEM_MESSAGE = """You are a helpful voice assistant. When a user asks a question, use the ask_perplexity function to get the answer.
+Remember your output is connected to TTS, so avoid symbols in response. Speak in a conversational way.
+To insert breaks (or pauses) in generated speech, use <break time="1s" /> tags. 
+To spell out text, wrap it in <spell> tags.
+Use appropriate punctuation and add pauses with '-' where needed."""
 
 async def ask_perplexity(question: str) -> str:
     try:
@@ -70,9 +76,39 @@ async def handle_perplexity(function_name, tool_call_id, args, llm, context, res
             "content": "I encountered an error processing your request. Please try again."
         }])
 
+async def create_initial_context():
+    context = OpenAILLMContext(messages=[
+        {
+            "role": "system",
+            "content": SYSTEM_MESSAGE
+        }
+    ])
+    
+    context.set_tools([
+        {
+            "type": "function",
+            "function": {
+                "name": "ask_perplexity",
+                "description": "Get an answer from Perplexity AI",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "question": {
+                            "type": "string",
+                            "description": "The user's question"
+                        }
+                    },
+                    "required": ["question"]
+                }
+            }
+        }
+    ])
+    
+    return context
+
 async def main():
     try:
-        port = int(os.getenv("PORT", "8080"))  # Added default port
+        port = int(os.getenv("PORT", "8080"))
         
         # Validate required environment variables
         required_env_vars = [
@@ -88,7 +124,7 @@ async def main():
 
         transport = WebsocketServerTransport(
             params=WebsocketServerParams(
-                host="0.0.0.0",  # Changed from empty string for clarity
+                host="0.0.0.0",
                 port=port,
                 audio_out_enabled=True,
                 add_wav_header=True,
@@ -110,38 +146,8 @@ async def main():
             voice_id="829ccd10-f8b3-43cd-b8a0-4aeaa81f3b30",
         )
 
-        # Initialize context with messages
-        messages = [
-            {
-                "role": "system",
-                "content": """You are a helpful voice assistant. When a user asks a question, use the ask_perplexity function to get the answer.
-                Remember your output is connected to TTS, so avoid symbols in response. Speak in a conversational way.
-                To insert breaks (or pauses) in generated speech, use <break time="1s" /> tags. 
-                To spell out text, wrap it in <spell> tags.
-                Use appropriate punctuation and add pauses with '-' where needed."""
-            }
-        ]
-        context = OpenAILLMContext(messages=messages)
-        context.set_tools([
-            {
-                "type": "function",
-                "function": {
-                    "name": "ask_perplexity",
-                    "description": "Get an answer from Perplexity AI",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "question": {
-                                "type": "string",
-                                "description": "The user's question"
-                            }
-                        },
-                        "required": ["question"]
-                    }
-                }
-            }
-        ])
-
+        # Create initial context
+        context = await create_initial_context()
         context_aggregator = llm.create_context_aggregator(context)
         llm.register_function("ask_perplexity", handle_perplexity)
 
@@ -163,13 +169,13 @@ async def main():
         @transport.event_handler("on_client_connected")
         async def on_client_connected(transport, client):
             try:
-                logger.info(f"New client connected from {client.remote_address}")
+                logger.info(f"New client connected from {client.remote_address if hasattr(client, 'remote_address') else 'unknown'}")
                 context.messages.clear()
                 context.add_message({
                     "role": "system",
-                    "content": messages[0]["content"]
+                    "content": SYSTEM_MESSAGE
                 })
-                context_aggregator = llm.create_context_aggregator(context)
+                new_context_aggregator = llm.create_context_aggregator(context)
                 await task.queue_frames([OpenAILLMContextFrame(context)])
             except Exception as e:
                 logger.error(f"Error in on_client_connected: {str(e)}")
@@ -177,7 +183,7 @@ async def main():
         @transport.event_handler("on_client_disconnected")
         async def on_client_disconnected(transport, client):
             try:
-                logger.info(f"Client disconnected from {client.remote_address}")
+                logger.info(f"Client disconnected from {client.remote_address if hasattr(client, 'remote_address') else 'unknown'}")
                 await task.queue_frames([EndFrame()])
             except Exception as e:
                 logger.error(f"Error in on_client_disconnected: {str(e)}")
