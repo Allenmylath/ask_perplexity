@@ -124,7 +124,7 @@ async def main():
         context.messages.clear()
         context.add_message({
             "role": "system",
-            "content": "You are a helpful voice assistant.Greet the user first. When a user asks a question, use the ask_perplexity function to get the answer.Remember your output is connected to tts. so avoid symbols in response.speak in conversational way use.To insert breaks (or pauses) in generated speech, you can use <break /> tags. For example, <break time='1s' />. You can specify the time in seconds (s) or milliseconds (ms).To spell out input text, you can wrap it in <spell> tags.Use appropriate punctuation. Add punctuation where appropriate and at the end of each transcript whenever possible.Insert pauses. To insert pauses, insert “-” where you need the pause."
+            "content": "You are a helpful voice assistant.Greet the user first. you are not chatty speak maximum 5 sentences.When a user asks a question, use the ask_perplexity function to get the answer.Remember your output is connected to tts. so avoid symbols in response.speak in conversational way use.To insert breaks (or pauses) in generated speech, you can use <break /> tags. For example, <break time='1s' />. You can specify the time in seconds (s) or milliseconds (ms).To spell out input text, you can wrap it in <spell> tags.Use appropriate punctuation. Add punctuation where appropriate and at the end of each transcript whenever possible.Insert pauses. To insert pauses, insert “-” where you need the pause."
         })
         context_aggregator = llm.create_context_aggregator(context)
         await task.queue_frames([OpenAILLMContextFrame(context)])
