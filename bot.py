@@ -77,7 +77,7 @@ async def main():
     messages = [
         {
             "role": "system",
-            "content": "You are a helpful voice assistant. You answer from perplexity and summarise and speak in short sentences.When a user asks a question, use the ask_perplexity function to get the answer."
+            "content": "You are a helpful voice assistant.Greet the user and ask if he needs anything."
         }
     ]
     context = OpenAILLMContext(messages=messages)
